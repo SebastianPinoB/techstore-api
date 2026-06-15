@@ -3,7 +3,6 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
-    # Nota: Quitamos container_name (Swarm los nombra automáticamente según las réplicas)
     environment:
       POSTGRES_DB: techstore
       POSTGRES_USER: postgres
@@ -17,20 +16,18 @@ services:
         condition: on-failure
 
   microservicio:
-    # Nota: En Swarm se usa una imagen pre-construida de un registro (ej. Docker Hub)
-    # Por ahora dejamos la etiqueta, la construiremos en el pipeline de CI/CD
-    image: techstore-api:latest
+    # Docker Swarm reemplazará esto automáticamente al desplegar
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/techstore-api:latest
     ports:
       - "8080:8080"
     environment:
-      # Usamos el nombre del servicio 'postgres' gracias a la red overlay
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/techstore
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: admin123
     networks:
       - techstore-net
     deploy:
-      replicas: 2           # <-- ¡Esto demuestra escalabilidad empresarial! (IL3.3)
+      replicas: 2
       update_config:
         parallelism: 1
         delay: 10s
@@ -39,4 +36,4 @@ services:
 
 networks:
   techstore-net:
-    driver: overlay         # <-- Red requerida para comunicación entre nodos de Swarm
+    driver: overlay
