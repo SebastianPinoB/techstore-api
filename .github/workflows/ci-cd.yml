@@ -41,8 +41,12 @@ jobs:
     # PASO CLAVE PARA IE5: Provisión automática del servicio de registro en la nube
     - name: Verificar o Crear Repositorio en AWS ECR
       run: |
-        aws ecr describe-repositories --repository-names techstore-api || \
-        aws ecr create-repository --repository-names techstore-api
+        if ! aws ecr describe-repositories --repository-names techstore-api > /dev/null 2>&1; then
+          echo "El repositorio no existe. Creándolo ahora..."
+          aws ecr create-repository --repository-name techstore-api
+        else
+          echo "El repositorio ya existe."
+        fi
 
     - name: Iniciar sesión en AWS ECR
       id: login-ecr
