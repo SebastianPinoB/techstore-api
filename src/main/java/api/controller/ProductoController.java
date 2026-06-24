@@ -39,7 +39,7 @@ public class ProductoController {
 
     // Inyecta la URL de la cola desde variables de entorno en la Task Definition de
     // ECS
-    @Value("${aws.sqs.queue.url}")
+    @Value("${aws.sqs.queue-url}")
     private String queueUrl;
 
     ProductoController(SqsClient sqsClient) {

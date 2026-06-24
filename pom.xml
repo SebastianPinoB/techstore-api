@@ -46,7 +46,7 @@
 		<dependency>
 			<groupId>software.amazon.awssdk</groupId>
 			<artifactId>sqs</artifactId>
-			<version>2.20.162</version> <!-- O la versión estable que prefieras -->
+			<version>2.20.162</version> 
    	</dependency>
 
 		<dependency>
