@@ -10,6 +10,7 @@ env:
   ECS_SERVICE: techstore-api-service
   ECS_TASK_DEFINITION: .aws/task-definition.json
   CONTAINER_NAME: techstore-api
+  ECR_REPOSITORY: techstore-api
 
 jobs:
   # ETAPA 1: Calidad y Trazabilidad (IE4)
@@ -29,7 +30,7 @@ jobs:
     - name: Compilar y Ejecutar Tests con Maven
       run: ./mvnw clean package -DskipTests
 
-  # ETAPA 2: Provisión Cloud, Construcción y Push a AWS ECR (IE1, IE4, IE5)
+  # ETAPA 2: Provisión Cloud, Construcción y Push a AWS ECR (Formato AWS Academy)
   deploy-to-ecr:
     needs: build-and-test
     runs-on: ubuntu-latest
@@ -45,19 +46,21 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: ${{ env.AWS_REGION }}
 
-    - name: Iniciar sesión en AWS ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+    # Usamos el comando nativo de AWS CLI que la academia no bloquea
+    - name: Iniciar sesión en Amazon ECR
+      run: |
+        aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
 
-    - name: Construir imagen y subir a AWS ECR
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile
-        push: true
-        tags: |
-          ${{ steps.login-ecr.outputs.registry }}/techstore-api:latest
-          ${{ steps.login-ecr.outputs.registry }}/techstore-api:${{ github.sha }}
+    - name: Construir imagen Docker
+      run: |
+        docker build -t ${{ env.ECR_REPOSITORY }} .
+        docker tag ${{ env.ECR_REPOSITORY }}:latest 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+        docker tag ${{ env.ECR_REPOSITORY }}:latest 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+
+    - name: Subir imagen a Amazon ECR
+      run: |
+        docker push 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+        docker push 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
   # ETAPA 3: Orquestación y Despliegue Nativo en Amazon ECS Fargate (IE1, IE5)
   deploy-to-ecs:
@@ -75,20 +78,16 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: ${{ env.AWS_REGION }}
 
-    - name: Iniciar sesión en AWS ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
-
-    # PASO CLAVE: Actualizar dinámicamente la Task Definition con el tag único del commit
+    # Modificar ID de imagen en la Task Definition apuntando a tu ECR real
     - name: Modificar ID de imagen en la Task Definition de Amazon ECS
       id: task-def
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
         task-definition: ${{ env.ECS_TASK_DEFINITION }}
         container-name: ${{ env.CONTAINER_NAME }}
-        image: ${{ steps.login-ecr.outputs.registry }}/techstore-api:${{ github.sha }}
+        image: 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
-    # PASO FINAL: Despliegue controlado y validación de estabilidad del servicio en Fargate
+    # Despliegue en el servicio de ECS
     - name: Desplegar nueva Task Definition en Amazon ECS
       uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
