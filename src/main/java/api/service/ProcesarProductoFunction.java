@@ -13,7 +13,7 @@ public class ProcesarProductoFunction {
    @Bean
     public Consumer<Producto> procesarSincronizacion() { // <-- Cambiado de ProductoDTO a Producto
         return producto -> {
-            System.out.println("🚀 [Serverless FaaS] Sincronizando nuevo producto con inventario Cloud...");
+            System.out.println("[Serverless FaaS] Sincronizando nuevo producto con inventario Cloud...");
             
             // Calculamos métricas del inventario basándonos en tu entidad
             double valorTotalStock = producto.getPrecio() * producto.getStock();

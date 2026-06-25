@@ -1,8 +1,15 @@
-name: CI/CD Pipeline TechStore con AWS ECR
+name: CI/CD Pipeline TechStore con AWS ECR y ECS Fargate
 
 on:
   push:
     branches: [ "main" ]
+
+env:
+  AWS_REGION: us-east-1
+  ECS_CLUSTER: techstore-cluster
+  ECS_SERVICE: techstore-api-service
+  ECS_TASK_DEFINITION: .aws/task-definition.json
+  CONTAINER_NAME: techstore-api
 
 jobs:
   # ETAPA 1: Calidad y Trazabilidad (IE4)
@@ -20,7 +27,7 @@ jobs:
         cache: 'maven'
 
     - name: Compilar y Ejecutar Tests con Maven
-      run: mvn clean package -DskipTests
+      run: ./mvnw clean package -DskipTests
 
   # ETAPA 2: Provisión Cloud, Construcción y Push a AWS ECR (IE1, IE4, IE5)
   deploy-to-ecr:
@@ -36,7 +43,7 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        aws-region: ${{ env.AWS_REGION }}
 
     # PASO CLAVE PARA IE5: Provisión automática del servicio de registro en la nube
     - name: Verificar o Crear Repositorio en AWS ECR
@@ -61,3 +68,41 @@ jobs:
         tags: |
           ${{ steps.login-ecr.outputs.registry }}/techstore-api:latest
           ${{ steps.login-ecr.outputs.registry }}/techstore-api:${{ github.sha }}
+
+  # ETAPA 3: Orquestación y Despliegue Nativo en Amazon ECS Fargate (IE1, IE5)
+  deploy-to-ecs:
+    needs: deploy-to-ecr
+    runs-on: ubuntu-latest
+    steps:
+    - name: Descargar el código del repositorio
+      uses: actions/checkout@v4
+
+    - name: Configurar credenciales de AWS
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Iniciar sesión en AWS ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # PASO CLAVE: Actualizar dinámicamente la Task Definition con el tag único del commit
+    - name: Modificar ID de imagen en la Task Definition de Amazon ECS
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: ${{ env.ECS_TASK_DEFINITION }}
+        container-name: ${{ env.CONTAINER_NAME }}
+        image: ${{ steps.login-ecr.outputs.registry }}/techstore-api:${{ github.sha }}
+
+    # PASO FINAL: Despliegue controlado y validación de estabilidad del servicio en Fargate
+    - name: Desplegar nueva Task Definition en Amazon ECS
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true

@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>cl.techstore</groupId>
 	<artifactId>api</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<name/>
 	<description/>
 	<url/>
@@ -41,6 +41,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>sqs</artifactId>
 		</dependency>
 
 		<dependency>

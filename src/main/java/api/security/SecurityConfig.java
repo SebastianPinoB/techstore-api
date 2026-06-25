@@ -17,16 +17,20 @@ public class SecurityConfig {
     private JwtFilter jwtFilter;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            // 1. Deshabilitar CSRF (Crucial para que Postman pueda hacer POST/PUT/DELETE)
             .csrf(csrf -> csrf.disable())
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            
+            // 2. Definir las reglas de los endpoints
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/login").permitAll()
+                .requestMatchers("/api/productos/**").permitAll() // Deja pasar libre para probar SQS
+                .requestMatchers("/api/auth/**").permitAll()
                 .anyRequest().authenticated()
-            )
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+            );
+            
+            // 3. Si necesitas que el filtro JWT procese el token (sin bloquear los permitAll):
+            // http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

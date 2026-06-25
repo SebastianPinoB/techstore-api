@@ -12,7 +12,7 @@ WORKDIR /app
 # Crea usuario no root 
 RUN addgroup -S spring && adduser -S spring -G spring
 # Copia jar desde builder
-COPY --from=builder /app/target/techstore-api-1.0.0.jar app.jar
+COPY --from=builder /app/target/*.jar app.jar
 # Usar usuario no-root
 USER spring
 # Exponer puerto

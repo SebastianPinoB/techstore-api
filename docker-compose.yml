@@ -27,6 +27,8 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/techstore
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=admin123
+      # AGREGA LA URL DE LA COLA SQS
+      - AWS_SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/989804099124/techstore-audit-queue
     networks:
       - techstore-net
     deploy:
