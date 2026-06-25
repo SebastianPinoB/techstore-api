@@ -49,16 +49,17 @@ jobs:
     # Usamos la acción oficial de login que, con el token de sesión,
     # suele ser aceptada si el repo ya existe.
     - name: Iniciar sesión en Amazon ECR
-      uses: aws-actions/amazon-ecr-login@v2
-
+      run: |
+        # Obtenemos el password directamente sin usar la acción que nos bloquea
+        aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+    
     - name: Construir y subir imagen
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: |
-          989804099124.dkr.ecr.us-east-1.amazonaws.com/techstore-api:latest
-          989804099124.dkr.ecr.us-east-1.amazonaws.com/techstore-api:${{ github.sha }}
+      run: |
+        docker build -t techstore-api .
+        docker tag techstore-api:latest 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/techstore-api:latest
+        docker tag techstore-api:latest 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/techstore-api:${{ github.sha }}
+        docker push 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/techstore-api:latest
+        docker push 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/techstore-api:${{ github.sha }}
 
   # ETAPA 3: Orquestación y Despliegue Nativo en Amazon ECS Fargate (IE1, IE5)
   deploy-to-ecs:
