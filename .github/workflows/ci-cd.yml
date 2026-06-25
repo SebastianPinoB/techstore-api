@@ -46,21 +46,19 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: ${{ env.AWS_REGION }}
 
-    # Usamos el comando nativo de AWS CLI que la academia no bloquea
+    # Usamos la acción oficial de login que, con el token de sesión,
+    # suele ser aceptada si el repo ya existe.
     - name: Iniciar sesión en Amazon ECR
-      run: |
-        aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+      uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Construir imagen Docker
-      run: |
-        docker build -t ${{ env.ECR_REPOSITORY }} .
-        docker tag ${{ env.ECR_REPOSITORY }}:latest 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
-        docker tag ${{ env.ECR_REPOSITORY }}:latest 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-
-    - name: Subir imagen a Amazon ECR
-      run: |
-        docker push 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
-        docker push 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+    - name: Construir y subir imagen
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: |
+          989804099124.dkr.ecr.us-east-1.amazonaws.com/techstore-api:latest
+          989804099124.dkr.ecr.us-east-1.amazonaws.com/techstore-api:${{ github.sha }}
 
   # ETAPA 3: Orquestación y Despliegue Nativo en Amazon ECS Fargate (IE1, IE5)
   deploy-to-ecs:
