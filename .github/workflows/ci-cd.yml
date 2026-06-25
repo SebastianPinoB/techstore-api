@@ -13,81 +13,64 @@ env:
   ECR_REPOSITORY: techstore-api
 
 jobs:
-  # ETAPA 1: Calidad y Trazabilidad (IE4)
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-    - name: Descargar el código del repositorio
+    - name: Descargar código
       uses: actions/checkout@v4
-
-    - name: Configurar el entorno de Java 21
+    - name: Configurar Java 21
       uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
-        cache: 'maven'
+    - name: Permisos y Build
+      run: |
+        chmod +x mvnw
+        ./mvnw clean package -DskipTests
 
-    - name: Compilar y Ejecutar Tests con Maven
-      run: ./mvnw clean package -DskipTests
-
-  # ETAPA 2: Provisión Cloud, Construcción y Push a AWS ECR (Formato AWS Academy)
   deploy-to-ecr:
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
-    - name: Descargar el código del repositorio
+    - name: Descargar código
       uses: actions/checkout@v4
-
-    - name: Configurar credenciales de AWS
+    - name: Configurar credenciales AWS
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: ${{ env.AWS_REGION }}
-
-    # Usamos la acción oficial de login que, con el token de sesión,
-    # suele ser aceptada si el repo ya existe.
-    - name: Iniciar sesión en Amazon ECR
+    - name: Construir y subir imagen a ECR
       run: |
-        # Obtenemos el password directamente sin usar la acción que nos bloquea
         aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
-    
-    - name: Construir y subir imagen
-      run: |
-        docker build -t techstore-api .
-        docker tag techstore-api:latest 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/techstore-api:latest
-        docker tag techstore-api:latest 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/techstore-api:${{ github.sha }}
-        docker push 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/techstore-api:latest
-        docker push 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/techstore-api:${{ github.sha }}
+        docker build -t ${{ env.ECR_REPOSITORY }} .
+        docker tag ${{ env.ECR_REPOSITORY }}:latest 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+        docker tag ${{ env.ECR_REPOSITORY }}:latest 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        docker push 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+        docker push 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
-  # ETAPA 3: Orquestación y Despliegue Nativo en Amazon ECS Fargate (IE1, IE5)
   deploy-to-ecs:
     needs: deploy-to-ecr
     runs-on: ubuntu-latest
     steps:
-    - name: Descargar el código del repositorio
+    - name: Descargar código
       uses: actions/checkout@v4
-
-    - name: Configurar credenciales de AWS
+    - name: Configurar credenciales AWS
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: ${{ env.AWS_REGION }}
-
-    # Modificar ID de imagen en la Task Definition apuntando a tu ECR real
-    - name: Modificar ID de imagen en la Task Definition de Amazon ECS
+    - name: Renderizar Task Definition
       id: task-def
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
         task-definition: ${{ env.ECS_TASK_DEFINITION }}
         container-name: ${{ env.CONTAINER_NAME }}
         image: 989804099124.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-
-    # Despliegue en el servicio de ECS
-    - name: Desplegar nueva Task Definition en Amazon ECS
+    - name: Desplegar en ECS
       uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
